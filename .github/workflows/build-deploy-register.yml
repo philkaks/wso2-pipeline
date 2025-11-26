@@ -148,7 +148,7 @@ jobs:
         run: chmod +x api/mvnw
 
       - name: Build with Maven
-        run: api/mvnw clean package -DskipTests
+        run: api/mvnw clean package -DskipTests -U
         working-directory: .
 
       # ========== DOCKER ==========
