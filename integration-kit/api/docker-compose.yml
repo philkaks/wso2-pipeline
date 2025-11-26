@@ -1,0 +1,26 @@
+# Standard docker-compose for SSERIS services
+# Copy to: your-service/api/docker-compose.yml
+#
+# All env vars are passed by the workflow - no changes needed!
+
+services:
+  app:
+    image: ${SERVICE_IMAGE}
+    container_name: sseris-${SERVICE_NAME}
+    restart: unless-stopped
+    networks:
+      - sseris-dev-server-network
+    environment:
+      QUARKUS_HTTP_HOST: 0.0.0.0
+      QUARKUS_HTTP_PORT: 8080
+      QUARKUS_DATASOURCE_JDBC_URL: ${QUARKUS_DATASOURCE_JDBC_URL}
+      QUARKUS_DATASOURCE_USERNAME: ${QUARKUS_DATASOURCE_USERNAME}
+      QUARKUS_DATASOURCE_PASSWORD: ${QUARKUS_DATASOURCE_PASSWORD}
+      QUARKUS_OIDC_AUTH_SERVER_URL: ${QUARKUS_OIDC_AUTH_SERVER_URL}
+      QUARKUS_OIDC_CLIENT_ID: ${QUARKUS_OIDC_CLIENT_ID}
+      QUARKUS_OIDC_CREDENTIALS_SECRET: ${QUARKUS_OIDC_CREDENTIALS_SECRET}
+      QUARKUS_REDIS_HOSTS: ${QUARKUS_REDIS_HOSTS}
+
+networks:
+  sseris-dev-server-network:
+    external: true

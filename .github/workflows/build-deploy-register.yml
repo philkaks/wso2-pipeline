@@ -53,11 +53,13 @@ jobs:
           API_CONTEXT=$(yq '.api.context' service-metadata.yml)
           DISPLAY_NAME=$(yq '.service.display_name' service-metadata.yml)
           DESCRIPTION=$(yq '.service.description // "API Service"' service-metadata.yml)
+          OIDC_CLIENT_ID=$(yq '.service.oidc_client_id' service-metadata.yml)
 
           echo "service_name=${SERVICE_NAME}" >> $GITHUB_OUTPUT
           echo "api_context=${API_CONTEXT}" >> $GITHUB_OUTPUT
           echo "display_name=${DISPLAY_NAME}" >> $GITHUB_OUTPUT
           echo "description=${DESCRIPTION}" >> $GITHUB_OUTPUT
+          echo "oidc_client_id=${OIDC_CLIENT_ID}" >> $GITHUB_OUTPUT
 
           echo "========================================"
           echo "Service Configuration"
@@ -185,11 +187,16 @@ jobs:
       - name: Deploy with Docker Compose
         working-directory: api
         env:
-          RETAIL_OPS_SERVICE_IMAGE: ${{ env.REGISTRY }}/${{ env.PROJECT }}/${{ env.CONTAINER_PREFIX }}-${{ steps.config.outputs.service_name }}:latest
+          SERVICE_NAME: ${{ steps.config.outputs.service_name }}
+          SERVICE_IMAGE: ${{ env.REGISTRY }}/${{ env.PROJECT }}/${{ env.CONTAINER_PREFIX }}-${{ steps.config.outputs.service_name }}:latest
           HARBOR_REGISTRY: ${{ env.REGISTRY }}
+          QUARKUS_DATASOURCE_JDBC_URL: jdbc:postgresql://postgres:5432/core
           QUARKUS_DATASOURCE_USERNAME: ${{ secrets.DB_USERNAME }}
           QUARKUS_DATASOURCE_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          QUARKUS_OIDC_AUTH_SERVER_URL: http://keycloak:8080/realms/ssra
+          QUARKUS_OIDC_CLIENT_ID: ${{ steps.config.outputs.oidc_client_id }}
           QUARKUS_OIDC_CREDENTIALS_SECRET: ${{ secrets.KEYCLOAK_CLIENT_SECRET }}
+          QUARKUS_REDIS_HOSTS: redis://redis:6379
         run: |
           set -euxo pipefail
 
@@ -208,12 +215,11 @@ jobs:
       - name: Wait for health
         run: |
           CONTAINER="${{ env.CONTAINER_PREFIX }}-${{ steps.config.outputs.service_name }}"
-          HEALTH_URL="http://${CONTAINER}:8080/q/health"
 
           echo "Waiting for ${CONTAINER} to be healthy..."
 
           for i in {1..30}; do
-            if curl -sf "${HEALTH_URL}" >/dev/null 2>&1; then
+            if docker exec ${CONTAINER} curl -sf http://localhost:8080/q/health >/dev/null 2>&1; then
               echo "Service is healthy!"
               exit 0
             fi
