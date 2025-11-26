@@ -18,4 +18,12 @@ concurrency:
 jobs:
   deploy:
     uses: philkaks/wso2-pipeline/.github/workflows/build-deploy-register.yml@main
-    secrets: inherit
+    secrets:
+      HARBOR_USERNAME: ${{ secrets.HARBOR_USERNAME }}
+      HARBOR_PASSWORD: ${{ secrets.HARBOR_PASSWORD }}
+      NEXUS_USER: ${{ secrets.NEXUS_USER }}
+      NEXUS_PASS: ${{ secrets.NEXUS_PASS }}
+      DB_USERNAME: ${{ secrets.DB_USERNAME }}
+      DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+      KEYCLOAK_CLIENT_SECRET: ${{ secrets.KEYCLOAK_CLIENT_SECRET }}
+      WSO2_ADMIN_PASSWORD: ${{ secrets.WSO2_ADMIN_PASSWORD }}
