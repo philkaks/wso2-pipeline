@@ -7,21 +7,21 @@ on:
   workflow_call:
     secrets:
       HARBOR_USERNAME:
-        required: true
+        description: Harbor registry username
       HARBOR_PASSWORD:
-        required: true
+        description: Harbor registry password
       NEXUS_USER:
-        required: true
+        description: Nexus Maven repo username
       NEXUS_PASS:
-        required: true
+        description: Nexus Maven repo password
       DB_USERNAME:
-        required: true
+        description: Database username
       DB_PASSWORD:
-        required: true
+        description: Database password
       KEYCLOAK_CLIENT_SECRET:
-        required: true
+        description: Keycloak OIDC client secret
       WSO2_ADMIN_PASSWORD:
-        required: true
+        description: WSO2 admin password
 
 env:
   REGISTRY: 84.247.134.135:8081
