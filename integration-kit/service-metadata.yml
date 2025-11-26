@@ -1,0 +1,47 @@
+# Service Metadata for WSO2 API Gateway Registration
+# THIS IS THE ONLY FILE YOU NEED TO EDIT
+#
+# The deploy.yml workflow is standardized - do not modify it.
+# All deployment settings are managed centrally in wso2-pipeline.
+
+service:
+  name: "your-service-name"              # Unique identifier (e.g., "retail-operations")
+  display_name: "Your Service API"       # Shown in WSO2 DevPortal
+  description: "Description of your API" # Brief description for API consumers
+
+api:
+  context: "/your-path"                  # URL path (e.g., "/retail" → apim.ayinza.dev/retail/v1)
+
+# ============================================================
+# EXAMPLES
+# ============================================================
+#
+# Retail Operations Service:
+#   service:
+#     name: "retail-operations"
+#     display_name: "Retail Operations API"
+#     description: "Manage stores, inventory, and retail workflows"
+#   api:
+#     context: "/retail"
+#
+# User Management Service:
+#   service:
+#     name: "user-management"
+#     display_name: "User Management API"
+#     description: "Handle user accounts and authentication"
+#   api:
+#     context: "/users"
+#
+# ============================================================
+# NAMING CONVENTIONS
+# ============================================================
+#
+# service.name:
+#   - Use lowercase with hyphens (e.g., "retail-operations")
+#   - Must be unique across all services
+#   - Will be used as: container name, Docker image tag, registry entry
+#
+# api.context:
+#   - Must start with "/" (e.g., "/retail")
+#   - Keep it short and meaningful
+#   - Final API URL: https://apim.ayinza.dev{context}/v1

@@ -1,0 +1,352 @@
+name: Build, Deploy & Register API (Reusable)
+
+# This workflow is called by service repos via workflow_call
+# All config is read from service-metadata.yml in the calling repo
+
+on:
+  workflow_call:
+    secrets:
+      HARBOR_USERNAME:
+        required: true
+      HARBOR_PASSWORD:
+        required: true
+      NEXUS_USER:
+        required: true
+      NEXUS_PASS:
+        required: true
+      DB_USERNAME:
+        required: true
+      DB_PASSWORD:
+        required: true
+      KEYCLOAK_CLIENT_SECRET:
+        required: true
+      WSO2_ADMIN_PASSWORD:
+        required: true
+
+env:
+  REGISTRY: 84.247.134.135:8081
+  PROJECT: library
+  WSO2_URL: https://apim.ayinza.dev
+  WSO2_ENV: dev
+  CONTAINER_PREFIX: sseris
+  DOCKER_NETWORK: sseris-dev-server-network
+
+jobs:
+  build-deploy-register:
+    name: Build, Deploy & Register
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout service repo
+        uses: actions/checkout@v4
+
+      # ========== READ CONFIG FROM service-metadata.yml ==========
+      - name: Read service config
+        id: config
+        run: |
+          if [[ ! -f service-metadata.yml ]]; then
+            echo "ERROR: service-metadata.yml not found in repository root"
+            exit 1
+          fi
+
+          SERVICE_NAME=$(yq '.service.name' service-metadata.yml)
+          API_CONTEXT=$(yq '.api.context' service-metadata.yml)
+          DISPLAY_NAME=$(yq '.service.display_name' service-metadata.yml)
+          DESCRIPTION=$(yq '.service.description // "API Service"' service-metadata.yml)
+
+          echo "service_name=${SERVICE_NAME}" >> $GITHUB_OUTPUT
+          echo "api_context=${API_CONTEXT}" >> $GITHUB_OUTPUT
+          echo "display_name=${DISPLAY_NAME}" >> $GITHUB_OUTPUT
+          echo "description=${DESCRIPTION}" >> $GITHUB_OUTPUT
+
+          echo "========================================"
+          echo "Service Configuration"
+          echo "========================================"
+          echo "Service Name: ${SERVICE_NAME}"
+          echo "Display Name: ${DISPLAY_NAME}"
+          echo "API Context:  ${API_CONTEXT}"
+          echo "========================================"
+
+      - name: Validate config
+        run: |
+          if [ -z "${{ steps.config.outputs.service_name }}" ] || [ "${{ steps.config.outputs.service_name }}" = "null" ]; then
+            echo "ERROR: service.name missing in service-metadata.yml"
+            exit 1
+          fi
+          if [ -z "${{ steps.config.outputs.api_context }}" ] || [ "${{ steps.config.outputs.api_context }}" = "null" ]; then
+            echo "ERROR: api.context missing in service-metadata.yml"
+            exit 1
+          fi
+          echo "Config validated successfully"
+
+      # ========== BUILD ==========
+      - name: Set up JDK 22
+        uses: actions/setup-java@v4
+        with:
+          java-version: '22'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Configure Maven settings
+        run: |
+          mkdir -p ~/.m2
+          cat > ~/.m2/settings.xml << 'EOF'
+          <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+                    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                    xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0
+                                        https://maven.apache.org/xsd/settings-1.0.0.xsd">
+            <servers>
+              <server>
+                <id>ayinza-public</id>
+                <username>${env.NEXUS_USER}</username>
+                <password>${env.NEXUS_PASS}</password>
+              </server>
+              <server>
+                <id>ayinza-snapshots</id>
+                <username>${env.NEXUS_USER}</username>
+                <password>${env.NEXUS_PASS}</password>
+              </server>
+              <server>
+                <id>ayinza-releases</id>
+                <username>${env.NEXUS_USER}</username>
+                <password>${env.NEXUS_PASS}</password>
+              </server>
+            </servers>
+            <profiles>
+              <profile>
+                <id>ayinza</id>
+                <repositories>
+                  <repository>
+                    <id>ayinza-public</id>
+                    <url>http://84.247.134.135:8082/repository/maven-public/</url>
+                    <releases><enabled>true</enabled></releases>
+                    <snapshots><enabled>true</enabled></snapshots>
+                  </repository>
+                </repositories>
+                <pluginRepositories>
+                  <pluginRepository>
+                    <id>ayinza-public</id>
+                    <url>http://84.247.134.135:8082/repository/maven-public/</url>
+                    <releases><enabled>true</enabled></releases>
+                    <snapshots><enabled>true</enabled></snapshots>
+                  </pluginRepository>
+                </pluginRepositories>
+              </profile>
+            </profiles>
+            <activeProfiles>
+              <activeProfile>ayinza</activeProfile>
+            </activeProfiles>
+          </settings>
+          EOF
+        env:
+          NEXUS_USER: ${{ secrets.NEXUS_USER }}
+          NEXUS_PASS: ${{ secrets.NEXUS_PASS }}
+
+      - name: Ensure Maven wrapper is executable
+        run: chmod +x api/mvnw
+
+      - name: Build with Maven
+        run: api/mvnw clean package -DskipTests
+        working-directory: .
+
+      # ========== DOCKER ==========
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver: docker
+
+      - name: Login to Harbor
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.HARBOR_USERNAME }}
+          password: ${{ secrets.HARBOR_PASSWORD }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./api
+          file: ./api/src/main/docker/Dockerfile.jvm
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.PROJECT }}/${{ env.CONTAINER_PREFIX }}-${{ steps.config.outputs.service_name }}:latest
+            ${{ env.REGISTRY }}/${{ env.PROJECT }}/${{ env.CONTAINER_PREFIX }}-${{ steps.config.outputs.service_name }}:${{ github.sha }}
+
+      # ========== DEPLOY ==========
+      - name: Ensure network exists
+        run: |
+          if ! docker network inspect ${{ env.DOCKER_NETWORK }} >/dev/null 2>&1; then
+            echo "Creating network ${{ env.DOCKER_NETWORK }}..."
+            docker network create ${{ env.DOCKER_NETWORK }}
+          else
+            echo "Network ${{ env.DOCKER_NETWORK }} already exists"
+          fi
+
+      - name: Deploy with Docker Compose
+        working-directory: api
+        env:
+          RETAIL_OPS_SERVICE_IMAGE: ${{ env.REGISTRY }}/${{ env.PROJECT }}/${{ env.CONTAINER_PREFIX }}-${{ steps.config.outputs.service_name }}:latest
+          HARBOR_REGISTRY: ${{ env.REGISTRY }}
+          QUARKUS_DATASOURCE_USERNAME: ${{ secrets.DB_USERNAME }}
+          QUARKUS_DATASOURCE_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          QUARKUS_OIDC_CREDENTIALS_SECRET: ${{ secrets.KEYCLOAK_CLIENT_SECRET }}
+        run: |
+          set -euxo pipefail
+
+          CONTAINER_NAME="${{ env.CONTAINER_PREFIX }}-${{ steps.config.outputs.service_name }}"
+
+          # Remove existing container if running
+          docker rm -f ${CONTAINER_NAME} 2>/dev/null || true
+
+          # Stop and remove via compose
+          docker compose down --remove-orphans || true
+
+          # Pull latest and start
+          docker compose pull
+          docker compose up -d
+
+      - name: Wait for health
+        run: |
+          CONTAINER="${{ env.CONTAINER_PREFIX }}-${{ steps.config.outputs.service_name }}"
+          HEALTH_URL="http://${CONTAINER}:8080/q/health"
+
+          echo "Waiting for ${CONTAINER} to be healthy..."
+
+          for i in {1..30}; do
+            if curl -sf "${HEALTH_URL}" >/dev/null 2>&1; then
+              echo "Service is healthy!"
+              exit 0
+            fi
+            echo "Attempt $i/30 - waiting..."
+            sleep 5
+          done
+
+          echo "ERROR: Health check failed after 30 attempts"
+          docker logs ${CONTAINER} --tail 50 || true
+          exit 1
+
+      # ========== REGISTER WITH WSO2 ==========
+      - name: Checkout wso2-pipeline scripts
+        uses: actions/checkout@v4
+        with:
+          repository: philkaks/wso2-pipeline
+          path: wso2-pipeline
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Fetch OpenAPI spec
+        run: |
+          CONTAINER="${{ env.CONTAINER_PREFIX }}-${{ steps.config.outputs.service_name }}"
+          OPENAPI_URL="http://${CONTAINER}:8080/q/openapi"
+
+          echo "Fetching OpenAPI from: ${OPENAPI_URL}"
+          curl -sf "${OPENAPI_URL}" -o openapi.json
+
+          if [[ ! -s openapi.json ]]; then
+            echo "ERROR: Failed to fetch OpenAPI spec"
+            exit 1
+          fi
+
+          echo "OpenAPI spec fetched: $(jq -r '.info.title' openapi.json)"
+
+      - name: Generate WSO2 API definition
+        run: |
+          chmod +x ./wso2-pipeline/scripts/generate-wso2-api.sh
+
+          ./wso2-pipeline/scripts/generate-wso2-api.sh \
+            --service "${{ steps.config.outputs.service_name }}" \
+            --context "${{ steps.config.outputs.api_context }}" \
+            --openapi openapi.json \
+            --output ./generated-api \
+            --prefix "${{ env.CONTAINER_PREFIX }}"
+
+      - name: Configure and login to apictl
+        run: |
+          # Add environment (ignore error if already exists)
+          apictl add env ${{ env.WSO2_ENV }} \
+            --apim ${{ env.WSO2_URL }} \
+            --token ${{ env.WSO2_URL }}/oauth2/token \
+            2>/dev/null || true
+
+          # Login
+          apictl login ${{ env.WSO2_ENV }} \
+            -u admin \
+            -p ${{ secrets.WSO2_ADMIN_PASSWORD }} \
+            -k
+
+      - name: Deploy API to WSO2
+        run: |
+          echo "Deploying API to WSO2..."
+
+          apictl import api \
+            -f ./generated-api \
+            -e ${{ env.WSO2_ENV }} \
+            --update \
+            --preserve-provider \
+            -k
+
+          echo "API deployed successfully!"
+
+      # ========== UPDATE RELEASE REGISTRY ==========
+      - name: Update release.json
+        run: |
+          SERVICE_NAME="${{ steps.config.outputs.service_name }}"
+          API_CONTEXT="${{ steps.config.outputs.api_context }}"
+          DISPLAY_NAME="${{ steps.config.outputs.display_name }}"
+
+          cd wso2-pipeline
+
+          # Create service directory if not exists
+          mkdir -p registry/services/${SERVICE_NAME}
+
+          # Update release.json
+          cat > registry/services/${SERVICE_NAME}/release.json << EOF
+          {
+            "service": "${SERVICE_NAME}",
+            "displayName": "${DISPLAY_NAME}",
+            "apiContext": "${API_CONTEXT}",
+            "apiUrl": "https://apim.ayinza.dev${API_CONTEXT}/v1",
+            "commit": "${{ github.sha }}",
+            "repository": "${{ github.repository }}",
+            "deployedAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "deployedBy": "${{ github.actor }}",
+            "status": "deployed"
+          }
+          EOF
+
+          echo "Release JSON created:"
+          cat registry/services/${SERVICE_NAME}/release.json
+
+      - name: Commit registry update
+        run: |
+          cd wso2-pipeline
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add registry/
+
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "chore: update ${{ steps.config.outputs.service_name }} deployment - ${{ github.sha }}"
+            git push
+            echo "Registry updated and pushed"
+          fi
+
+      # ========== SUMMARY ==========
+      - name: Deployment Summary
+        run: |
+          SERVICE="${{ steps.config.outputs.service_name }}"
+          CONTEXT="${{ steps.config.outputs.api_context }}"
+          DISPLAY="${{ steps.config.outputs.display_name }}"
+
+          echo "## Deployment Complete!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Service | ${SERVICE} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Display Name | ${DISPLAY} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Container | ${{ env.CONTAINER_PREFIX }}-${SERVICE} |" >> $GITHUB_STEP_SUMMARY
+          echo "| API URL | https://apim.ayinza.dev${CONTEXT}/v1 |" >> $GITHUB_STEP_SUMMARY
+          echo "| DevPortal | https://apim.ayinza.dev/devportal |" >> $GITHUB_STEP_SUMMARY
+          echo "| Commit | ${{ github.sha }} |" >> $GITHUB_STEP_SUMMARY

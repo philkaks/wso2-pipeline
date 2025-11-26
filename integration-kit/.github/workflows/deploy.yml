@@ -1,0 +1,21 @@
+# COPY THIS FILE AS-IS - DO NOT MODIFY
+# All configuration comes from service-metadata.yml in your repo root
+#
+# Branch policy (dev) and all deployment settings are enforced centrally
+# by the reusable workflow in wso2-pipeline
+
+name: Deploy
+
+on:
+  push:
+    branches: [dev]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    uses: philkaks/wso2-pipeline/.github/workflows/build-deploy-register.yml@main
+    secrets: inherit
