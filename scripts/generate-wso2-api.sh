@@ -54,11 +54,25 @@ mkdir -p "${OUTPUT_DIR}/Definitions"
 cp "${OPENAPI_FILE}" "${OUTPUT_DIR}/Definitions/swagger.yaml"
 
 # Extract API info from OpenAPI
-API_TITLE=$(jq -r '.info.title // "API"' "${OPENAPI_FILE}" | tr -d '"')
-API_DESCRIPTION=$(jq -r '.info.description // "Auto-registered API"' "${OPENAPI_FILE}" | tr -d '"')
+API_TITLE=$(jq -r '.info.title // empty' "${OPENAPI_FILE}" 2>/dev/null)
+API_DESCRIPTION=$(jq -r '.info.description // empty' "${OPENAPI_FILE}" 2>/dev/null)
+
+# Fallback to service name if title is empty
+if [[ -z "$API_TITLE" || "$API_TITLE" == "null" ]]; then
+  API_TITLE="${SERVICE_NAME}-api"
+fi
+
+if [[ -z "$API_DESCRIPTION" || "$API_DESCRIPTION" == "null" ]]; then
+  API_DESCRIPTION="Auto-registered API for ${SERVICE_NAME}"
+fi
 
 # Sanitize API name (remove special characters, replace spaces with dashes)
-API_NAME=$(echo "${API_TITLE}" | sed 's/[^a-zA-Z0-9 ]//g' | sed 's/ /-/g')
+API_NAME=$(echo "${API_TITLE}" | sed 's/[^a-zA-Z0-9 -]//g' | sed 's/ /-/g' | sed 's/--*/-/g')
+
+# Ensure API_NAME is not empty
+if [[ -z "$API_NAME" ]]; then
+  API_NAME="${SERVICE_NAME}-api"
+fi
 
 # Container name for backend endpoint
 CONTAINER_NAME="${CONTAINER_PREFIX}-${SERVICE_NAME}"
