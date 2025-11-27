@@ -48,11 +48,10 @@ echo "  OpenAPI: $OPENAPI_FILE"
 echo "  Output: $OUTPUT_DIR"
 
 # Create API project structure
-mkdir -p "${OUTPUT_DIR}/Meta-information"
 mkdir -p "${OUTPUT_DIR}/Definitions"
 
 # Copy OpenAPI spec
-cp "${OPENAPI_FILE}" "${OUTPUT_DIR}/Definitions/swagger.json"
+cp "${OPENAPI_FILE}" "${OUTPUT_DIR}/Definitions/swagger.yaml"
 
 # Extract API info from OpenAPI
 API_TITLE=$(jq -r '.info.title // "API"' "${OPENAPI_FILE}" | tr -d '"')
@@ -67,8 +66,8 @@ CONTAINER_NAME="${CONTAINER_PREFIX}-${SERVICE_NAME}"
 echo "  API Name: $API_NAME"
 echo "  Container: $CONTAINER_NAME"
 
-# Generate api.yaml
-cat > "${OUTPUT_DIR}/Meta-information/api.yaml" <<EOF
+# Generate api.yaml at root level (required by apictl 4.x)
+cat > "${OUTPUT_DIR}/api.yaml" <<EOF
 type: api
 version: v4.3.0
 data:
