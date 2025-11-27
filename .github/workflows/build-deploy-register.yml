@@ -307,6 +307,37 @@ jobs:
             -p ${{ secrets.WSO2_ADMIN_PASSWORD }} \
             -k
 
+      - name: Clean up existing API with same context
+        run: |
+          API_CONTEXT="${{ steps.config.outputs.api_context }}"
+          echo "Checking for existing APIs with context: ${API_CONTEXT}"
+
+          # List all APIs and find any with matching context
+          EXISTING_APIS=$(apictl list apis -e ${{ env.WSO2_ENV }} -k 2>/dev/null || echo "")
+          echo "Current APIs:"
+          echo "$EXISTING_APIS"
+
+          # Get API name from our generated api.yaml
+          NEW_API_NAME=$(grep "name:" ./generated-api/api.yaml | head -1 | sed 's/.*name: *"\([^"]*\)".*/\1/')
+          echo "New API name: ${NEW_API_NAME}"
+
+          # Try to delete any API that might have this context
+          # WSO2 requires name:version format for deletion
+          if echo "$EXISTING_APIS" | grep -q "${API_CONTEXT}"; then
+            echo "Found existing API with context ${API_CONTEXT}, attempting cleanup..."
+
+            # Extract API names that have this context (format: NAME VERSION CONTEXT ...)
+            API_TO_DELETE=$(echo "$EXISTING_APIS" | grep "${API_CONTEXT}" | awk '{print $1 ":" $2}' | head -1)
+
+            if [[ -n "$API_TO_DELETE" && "$API_TO_DELETE" != ":" ]]; then
+              echo "Deleting existing API: ${API_TO_DELETE}"
+              apictl delete api -n "${API_TO_DELETE}" -e ${{ env.WSO2_ENV }} -k || true
+              echo "Cleanup complete"
+            fi
+          else
+            echo "No existing API found with context ${API_CONTEXT}"
+          fi
+
       - name: Deploy API to WSO2
         run: |
           echo "Deploying API to WSO2..."
