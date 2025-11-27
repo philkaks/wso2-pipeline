@@ -270,10 +270,9 @@ jobs:
       - name: Fetch OpenAPI spec
         run: |
           CONTAINER="${{ env.CONTAINER_PREFIX }}-${{ steps.config.outputs.service_name }}"
-          OPENAPI_URL="http://${CONTAINER}:8080/q/openapi"
 
-          echo "Fetching OpenAPI from: ${OPENAPI_URL}"
-          curl -sf "${OPENAPI_URL}" -o openapi.json
+          echo "Fetching OpenAPI from container: ${CONTAINER}"
+          docker exec ${CONTAINER} curl -sf http://localhost:8080/q/openapi > openapi.json
 
           if [[ ! -s openapi.json ]]; then
             echo "ERROR: Failed to fetch OpenAPI spec"
