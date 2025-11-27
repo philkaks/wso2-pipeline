@@ -272,7 +272,8 @@ jobs:
           CONTAINER="${{ env.CONTAINER_PREFIX }}-${{ steps.config.outputs.service_name }}"
 
           echo "Fetching OpenAPI from container: ${CONTAINER}"
-          docker exec ${CONTAINER} curl -sf http://localhost:8080/q/openapi > openapi.json
+          # Request JSON format explicitly (Quarkus returns YAML by default)
+          docker exec ${CONTAINER} curl -sf "http://localhost:8080/q/openapi?format=json" > openapi.json
 
           if [[ ! -s openapi.json ]]; then
             echo "ERROR: Failed to fetch OpenAPI spec"

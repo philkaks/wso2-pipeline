@@ -50,8 +50,8 @@ echo "  Output: $OUTPUT_DIR"
 # Create API project structure
 mkdir -p "${OUTPUT_DIR}/Definitions"
 
-# Copy OpenAPI spec
-cp "${OPENAPI_FILE}" "${OUTPUT_DIR}/Definitions/swagger.yaml"
+# Copy OpenAPI spec (JSON format)
+cp "${OPENAPI_FILE}" "${OUTPUT_DIR}/Definitions/swagger.json"
 
 # Extract API info from OpenAPI
 API_TITLE=$(jq -r '.info.title // empty' "${OPENAPI_FILE}" 2>/dev/null)
