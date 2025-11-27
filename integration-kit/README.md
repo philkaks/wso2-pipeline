@@ -43,6 +43,8 @@ service:
   name: "retail-operations"           # Your service identifier (lowercase, hyphens)
   display_name: "Retail Operations API"  # Name shown in DevPortal
   description: "Manage retail operations"
+  oidc_client_id: "drie-retail-ops"   # Your Keycloak client ID
+  database: "retail_ops_db"           # PostgreSQL database (auto-created if missing)
 
 api:
   context: "/retail"                  # Your API path
@@ -101,6 +103,33 @@ If not already added to your `pom.xml`:
     <artifactId>quarkus-smallrye-openapi</artifactId>
 </dependency>
 ```
+
+### Configure OpenAPI Metadata (REQUIRED)
+
+Your OpenAPI spec **must** include `info` section for WSO2 registration to work.
+
+Add to your `application.properties`:
+
+```properties
+# OpenAPI Configuration (REQUIRED for WSO2 API registration)
+quarkus.smallrye-openapi.info-title=Your API Name
+quarkus.smallrye-openapi.info-description=Description of your API
+quarkus.smallrye-openapi.info-version=1.0.0
+quarkus.smallrye-openapi.info-contact-name=Your Team
+quarkus.smallrye-openapi.info-contact-email=team@ayinza.com
+```
+
+Or in `application.yml`:
+
+```yaml
+quarkus:
+  smallrye-openapi:
+    info-title: Your API Name
+    info-description: Description of your API
+    info-version: 1.0.0
+```
+
+**Why this matters**: The API name registered in WSO2 comes from the OpenAPI `info.title`. Without it, registration will fail.
 
 ### Dockerfile Location
 
