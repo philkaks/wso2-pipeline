@@ -199,13 +199,13 @@ jobs:
           SERVICE_NAME: ${{ steps.config.outputs.service_name }}
           SERVICE_IMAGE: ${{ env.REGISTRY }}/${{ env.PROJECT }}/${{ env.CONTAINER_PREFIX }}-${{ steps.config.outputs.service_name }}:latest
           HARBOR_REGISTRY: ${{ env.REGISTRY }}
-          QUARKUS_DATASOURCE_JDBC_URL: jdbc:postgresql://postgres:5432/core
+          QUARKUS_DATASOURCE_JDBC_URL: jdbc:postgresql://sseris-postgres:5432/fiscal_document_db
           QUARKUS_DATASOURCE_USERNAME: ${{ secrets.DB_USERNAME }}
           QUARKUS_DATASOURCE_PASSWORD: ${{ secrets.DB_PASSWORD }}
-          QUARKUS_OIDC_AUTH_SERVER_URL: http://keycloak:8080/realms/ssra
+          QUARKUS_OIDC_AUTH_SERVER_URL: http://drie-keycloak:8080/realms/ssra
           QUARKUS_OIDC_CLIENT_ID: ${{ steps.config.outputs.oidc_client_id }}
           QUARKUS_OIDC_CREDENTIALS_SECRET: ${{ secrets.KEYCLOAK_CLIENT_SECRET }}
-          QUARKUS_REDIS_HOSTS: redis://redis:6379
+          QUARKUS_REDIS_HOSTS: redis://drie-redis:6379
         run: |
           set -euxo pipefail
 
