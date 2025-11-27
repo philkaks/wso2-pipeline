@@ -310,12 +310,20 @@ jobs:
         run: |
           echo "Deploying API to WSO2..."
 
+          echo "=== Generated API Structure ==="
+          find ./generated-api -type f
+
+          echo "=== api.yaml contents ==="
+          cat ./generated-api/api.yaml
+
+          echo "=== Importing API ==="
           apictl import api \
             -f ./generated-api \
             -e ${{ env.WSO2_ENV }} \
             --update \
             --preserve-provider \
-            -k
+            -k \
+            --verbose
 
           echo "API deployed successfully!"
 
