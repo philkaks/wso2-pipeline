@@ -3,6 +3,7 @@ service:
   display_name: "Your Service API"       # Shown in WSO2 DevPortal
   description: "Description of your API"
   oidc_client_id: "your-keycloak-client" # Keycloak client ID for this service
+  database: "your_database_name"         # PostgreSQL database (created automatically if doesn't exist)
 
 api:
   context: "/your-path"                  # URL path (e.g., "/admin" → apim.ayinza.dev/admin/v1)

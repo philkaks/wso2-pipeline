@@ -54,12 +54,14 @@ jobs:
           DISPLAY_NAME=$(yq '.service.display_name' service-metadata.yml)
           DESCRIPTION=$(yq '.service.description // "API Service"' service-metadata.yml)
           OIDC_CLIENT_ID=$(yq '.service.oidc_client_id' service-metadata.yml)
+          DATABASE=$(yq '.service.database // "sseris_db"' service-metadata.yml)
 
           echo "service_name=${SERVICE_NAME}" >> $GITHUB_OUTPUT
           echo "api_context=${API_CONTEXT}" >> $GITHUB_OUTPUT
           echo "display_name=${DISPLAY_NAME}" >> $GITHUB_OUTPUT
           echo "description=${DESCRIPTION}" >> $GITHUB_OUTPUT
           echo "oidc_client_id=${OIDC_CLIENT_ID}" >> $GITHUB_OUTPUT
+          echo "database=${DATABASE}" >> $GITHUB_OUTPUT
 
           echo "========================================"
           echo "Service Configuration"
@@ -67,6 +69,7 @@ jobs:
           echo "Service Name: ${SERVICE_NAME}"
           echo "Display Name: ${DISPLAY_NAME}"
           echo "API Context:  ${API_CONTEXT}"
+          echo "Database:     ${DATABASE}"
           echo "========================================"
 
       - name: Validate config
@@ -193,13 +196,29 @@ jobs:
             echo "Network ${{ env.DOCKER_NETWORK }} already exists"
           fi
 
+      - name: Ensure database exists
+        env:
+          PGPASSWORD: ${{ secrets.DB_PASSWORD }}
+        run: |
+          DATABASE="${{ steps.config.outputs.database }}"
+          echo "Checking if database '${DATABASE}' exists..."
+
+          # Check if database exists, create if not
+          if docker exec sseris-postgres psql -U ${{ secrets.DB_USERNAME }} -d postgres -tc "SELECT 1 FROM pg_database WHERE datname = '${DATABASE}'" | grep -q 1; then
+            echo "Database '${DATABASE}' already exists"
+          else
+            echo "Creating database '${DATABASE}'..."
+            docker exec sseris-postgres psql -U ${{ secrets.DB_USERNAME }} -d postgres -c "CREATE DATABASE ${DATABASE};"
+            echo "Database '${DATABASE}' created successfully"
+          fi
+
       - name: Deploy with Docker Compose
         working-directory: api
         env:
           SERVICE_NAME: ${{ steps.config.outputs.service_name }}
           SERVICE_IMAGE: ${{ env.REGISTRY }}/${{ env.PROJECT }}/${{ env.CONTAINER_PREFIX }}-${{ steps.config.outputs.service_name }}:latest
           HARBOR_REGISTRY: ${{ env.REGISTRY }}
-          QUARKUS_DATASOURCE_JDBC_URL: jdbc:postgresql://sseris-postgres:5432/fiscal_document_db
+          QUARKUS_DATASOURCE_JDBC_URL: jdbc:postgresql://sseris-postgres:5432/${{ steps.config.outputs.database }}
           QUARKUS_DATASOURCE_USERNAME: ${{ secrets.DB_USERNAME }}
           QUARKUS_DATASOURCE_PASSWORD: ${{ secrets.DB_PASSWORD }}
           QUARKUS_OIDC_AUTH_SERVER_URL: http://drie-keycloak:8080/realms/ssra
