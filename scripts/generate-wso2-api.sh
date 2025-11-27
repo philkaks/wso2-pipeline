@@ -85,59 +85,24 @@ cat > "${OUTPUT_DIR}/api.yaml" <<EOF
 type: api
 version: v4.3.0
 data:
-  name: ${API_NAME}
+  name: "${API_NAME}"
   description: "${API_DESCRIPTION}"
-  context: ${API_CONTEXT}
-  version: ${API_VERSION}
-  provider: admin
-  lifeCycleStatus: PUBLISHED
-
-  endpointConfig:
-    endpoint_type: http
-    production_endpoints:
-      url: http://${CONTAINER_NAME}:8080
-    sandbox_endpoints:
-      url: http://${CONTAINER_NAME}:8080
-
-  visibility: PUBLIC
-  visibleRoles: []
-  visibleTenants: []
-
-  tier: Unlimited
-  subscriptionAvailability: CURRENT_TENANT
-
+  context: "${API_CONTEXT}"
+  version: "${API_VERSION}"
+  provider: "admin"
+  lifeCycleStatus: "CREATED"
+  type: "HTTP"
   transport:
-    - http
-    - https
-
-  securityScheme:
-    - oauth2
-
-  corsConfiguration:
-    corsConfigurationEnabled: true
-    accessControlAllowOrigins:
-      - "*"
-    accessControlAllowCredentials: false
-    accessControlAllowHeaders:
-      - authorization
-      - Access-Control-Allow-Origin
-      - Content-Type
-      - SOAPAction
-      - apikey
-      - Internal-Key
-    accessControlAllowMethods:
-      - GET
-      - POST
-      - PUT
-      - DELETE
-      - PATCH
-      - OPTIONS
-
-  tags:
-    - ${SERVICE_NAME}
-    - auto-registered
-
-  additionalProperties: []
+    - "http"
+    - "https"
+  policies:
+    - "Unlimited"
+  visibility: "PUBLIC"
+  endpointConfig:
+    endpoint_type: "http"
+    production_endpoints:
+      url: "http://${CONTAINER_NAME}:8080"
+  endpointImplementationType: "ENDPOINT"
 EOF
 
 # Generate deployment_environments.yaml
